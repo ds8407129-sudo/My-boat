@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Universal AI Interface</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            750: '#2d3748',
+                            850: '#1a202c',
+                            950: '#0d1117',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #4a5568; }
+        
+        /* Markdown Styling */
+        .prose pre { background-color: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+        .prose code { background-color: rgba(0,0,0,0.1); padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.875em; }
+        .dark .prose code { background-color: rgba(255,255,255,0.1); color: #e2e8f0; }
+        .prose p { margin-bottom: 0.75rem; line-height: 1.6; }
+        .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+        .prose ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+        .prose h1, .prose h2, .prose h3 { font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+        
+        /* Loader */
+        #loading-screen { position: fixed; inset: 0; background: #ffffff; z-index: 9999; display: flex; justify-content: center; align-items: center; transition: opacity 0.5s ease; }
+        .dark #loading-screen { background: #0f172a; color: white; }
+        
+        /* Mobile Layout Fixes */
+        body { height: 100dvh; overflow: hidden; } /* 100dvh handles mobile browser bars */
+        .glass-panel { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(8px); }
+        .dark .glass-panel { background: rgba(30, 41, 59, 0.8); }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 font-sans antialiased transition-colors duration-200">
+
+    <div id="loading-screen">
+        <div class="flex flex-col items-center gap-4">
+            <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-sm font-medium animate-pulse">Initializing Interface...</p>
+        </div>
+    </div>
+
+    <div id="app-root" class="flex h-full w-full overflow-hidden relative">
+        
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-gray-100 dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 transform -translate-x-full md:translate-x-0 transition-transform duration-300 flex flex-col h-full shadow-2xl md:shadow-none md:relative">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">Gemini Clone</h1>
+                <button id="close-sidebar" class="md:hidden p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="p-4">
+                <button id="btn-new-chat" class="w-full flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 border border-gray-200 dark:border-gray-700 rounded-full shadow-sm transition-all text-sm font-medium text-gray-700 dark:text-gray-200">
+                    <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    New Chat
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-2 space-y-1" id="chat-list">
+                </div>
+
+            <div class="p-4 border-t border-gray-200 dark:border-gray-800">
+                <div class="flex items-center justify-between gap-2">
+                    <button id="btn-settings" class="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        Settings
+                    </button>
+                    <button id="btn-theme-toggle" class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                        <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                        <svg class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden glass-panel opacity-0 transition-opacity"></div>
+
+        <main class="flex-1 flex flex-col h-full relative w-full">
+            
+            <header class="flex-none p-4 flex items-center justify-between md:hidden border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-900/90 backdrop-blur sticky top-0 z-20">
+                <button id="open-sidebar" class="p-2 -ml-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <span class="font-semibold text-gray-700 dark:text-gray-200" id="header-model-name">Gemini Clone</span>
+                <div class="w-8"></div> </header>
+
+            <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth">
+                <div id="welcome-screen" class="h-full flex flex-col items-center justify-center text-center opacity-100 transition-opacity duration-300">
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-6 shadow-lg flex items-center justify-center">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-bold mb-2 bg-gradient-to-r from-gray-800 to-gray-600 dark:from-gray-100 dark:to-gray-400 bg-clip-text text-transparent">How can I help you today?</h2>
+                    <p class="text-gray-500 dark:text-gray-400 max-w-md">Configure your API key in settings to start chatting with DeepSeek-R1 or other models.</p>
+                </div>
+            </div>
+
+            <div class="flex-none p-4 md:p-6 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-20">
+                <div class="max-w-4xl mx-auto relative">
+                    <form id="chat-form" class="relative flex items-end gap-2 bg-gray-100 dark:bg-gray-800 rounded-3xl border border-transparent focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all p-2">
+                        <textarea 
+                            id="user-input" 
+                            rows="1" 
+                            placeholder="Message..." 
+                            class="w-full bg-transparent text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 px-4 py-3 focus:outline-none resize-none max-h-48 overflow-y-auto"
+                            style="min-height: 48px;"
+                        ></textarea>
+                        <button type="submit" id="send-btn" disabled class="p-2 mb-1 rounded-full bg-blue-600 text-white disabled:bg-gray-300 disabled:dark:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors shadow-sm">
+                            <svg class="w-5 h-5 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                        </button>
+                    </form>
+                    <div class="text-center mt-2">
+                        <p class="text-xs text-gray-400 dark:text-gray-500">AI can make mistakes. Check important info.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="settings-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" id="settings-backdrop"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 border border-gray-200 dark:border-gray-800">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Settings</h3>
+                    <button id="close-settings" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">OpenRouter API Key</label>
+                        <input type="password" id="setting-api-key" placeholder="sk-or-..." class="w-full px-4 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white">
+                        <p class="text-xs text-gray-500 mt-1">Key is stored locally in your browser.</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Model ID</label>
+                        <input type="text" id="setting-model" value="deepseek/deepseek-r1:free" class="w-full px-4 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">System Prompt</label>
+                        <textarea id="setting-system-prompt" rows="3" class="w-full px-4 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white resize-none" placeholder="You are a helpful assistant..."></textarea>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-200 dark:border-gray-800">
+                        <button id="btn-clear-data" class="text-red-500 text-sm hover:underline">Clear all data & reset</button>
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-50 dark:bg-gray-850 flex justify-end">
+                    <button id="save-settings" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * APPLICATION STATE & UTILS
+         */
+        const AppState = {
+            apiKey: '',
+            model: 'deepseek/deepseek-r1:free',
+            systemPrompt: 'You are a helpful AI assistant.',
+            chats: [],
+            currentChatId: null,
+            theme: 'light',
+            isGenerating: false
+        };
+
+        const DOM = {
+            loader: document.getElementById('loading-screen'),
+            appRoot: document.getElementById('app-root'),
+            sidebar: document.getElementById('sidebar'),
+            sidebarOverlay: document.getElementById('sidebar-overlay'),
+            chatList: document.getElementById('chat-list'),
+            chatContainer: document.getElementById('chat-container'),
+            welcomeScreen: document.getElementById('welcome-screen'),
+            inputForm: document.getElementById('chat-form'),
+            userInput: document.getElementById('user-input'),
+            sendBtn: document.getElementById('send-btn'),
+            settingsModal: document.getElementById('settings-modal'),
+            apiKeyInput: document.getElementById('setting-api-key'),
+            modelInput: document.getElementById('setting-model'),
+            sysPromptInput: document.getElementById('setting-system-prompt')
+        };
+
+        // Utility: Generate ID
+        const uuid = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+        // Utility: Parse Markdown
+        marked.setOptions({
+            breaks: true,
+            highlight: function(code, lang) {
+                // Simple fallback since we aren't loading highlight.js to keep it minimal as requested, 
+                // but structure supports it.
+                return code; 
+            }
+        });
+
+        /**
+         * STORAGE LAYER
+         */
+        function loadState() {
+            try {
+                const stored = localStorage.getItem('gemini_clone_v1');
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    AppState.apiKey = data.apiKey || '';
+                    AppState.model = data.model || 'deepseek/deepseek-r1:free';
+                    AppState.systemPrompt = data.systemPrompt || 'You are a helpful AI assistant.';
+                    AppState.chats = data.chats || [];
+                    AppState.theme = data.theme || 'light';
+                    // Don't persist currentChatId across reloads, start fresh or logic to restore last
+                }
+            } catch (e) {
+                console.error("Failed to load state", e);
+            }
+            applyTheme();
+        }
+
+        function saveState() {
+            const data = {
+                apiKey: AppState.apiKey,
+                model: AppState.model,
+                systemPrompt: AppState.systemPrompt,
+                chats: AppState.chats,
+                theme: AppState.theme
+            };
+            localStorage.setItem('gemini_clone_v1', JSON.stringify(data));
+        }
+
+        /**
+         * THEME MANAGEMENT
+         */
+        function applyTheme() {
+            if (AppState.theme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+
+        function toggleTheme() {
+            AppState.theme = AppState.theme === 'light' ? 'dark' : 'light';
+            applyTheme();
+            saveState();
+        }
+
+        /**
+         * CHAT MANAGEMENT
+         */
+        function createNewChat() {
+            const newChat = {
+                id: uuid(),
+                title: 'New Chat',
+                messages: [],
+                timestamp: Date.now()
+            };
+            AppState.chats.unshift(newChat);
+            AppState.currentChatId = newChat.id;
+            saveState();
+            renderChatList();
+            renderCurrentChat();
+            
+            // Mobile: close sidebar on new chat
+            if (window.innerWidth < 768) toggleSidebar(false);
+            
+            // Focus input
+            setTimeout(() => DOM.userInput.focus(), 100);
+        }
+
+        function deleteChat(id, event) {
+            event.stopPropagation();
+            if(!confirm("Delete this chat?")) return;
+            
+            AppState.chats = AppState.chats.filter(c => c.id !== id);
+            if (AppState.currentChatId === id) {
+                AppState.currentChatId = null;
+            }
+            saveState();
+            renderChatList();
+            renderCurrentChat();
+        }
+
+        function loadChat(id) {
+            AppState.currentChatId = id;
+            renderChatList();
+            renderCurrentChat();
+            if (window.innerWidth < 768) toggleSidebar(false);
+        }
+
+        /**
+         * UI RENDERING
+         */
+        function renderChatList() {
+            DOM.chatList.innerHTML = '';
+            
+            AppState.chats.forEach(chat => {
+                const isActive = chat.id === AppState.currentChatId;
+                const div = document.createElement('div');
+                div.className = `group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
+                    isActive ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                }`;
+                div.onclick = () => loadChat(chat.id);
+                
+                div.innerHTML = `
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                        <span class="text-sm font-medium truncate">${chat.title}</span>
+                    </div>
+                    <button class="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity" onclick="deleteChat('${chat.id}', event)">
+                
